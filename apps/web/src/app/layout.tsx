@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "lumen-health",
-  description: "lumen-health",
+  title: "Lumen Health",
+  description: "Care task management for Lumen Health teams",
 };
 
 export default function RootLayout({

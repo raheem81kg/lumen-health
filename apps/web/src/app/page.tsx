@@ -1,31 +1,37 @@
 "use client"
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { useTRPC } from "@/utils/trpc";
-
-const TITLE_TEXT = `
- ██████╗ ███████╗████████╗████████╗███████╗██████╗
- ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
- ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
- ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
- ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
- ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
-
- ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
- ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
-    ██║       ███████╗   ██║   ███████║██║     █████╔╝
-    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
-    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
-    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- `;
+import Link from "next/link";
+import { Button } from "@lumen-health/ui/components/button";
 
 export default function Home() {
   const trpc = useTRPC();
   const healthCheck = useQuery(trpc.healthCheck.queryOptions());
-  
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/version`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setVersion(d.version))
+      .catch(() => {});
+  }, []);
+
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-2">
-      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
-      <div className="grid gap-6">
+    <div className="container mx-auto max-w-3xl px-4 py-12">
+      <div className="mb-10">
+        <p className="text-sm font-medium text-primary">Lumen Health</p>
+        <h1 className="mt-1 text-4xl font-bold tracking-tight">Care coordination, simplified</h1>
+        <p className="mt-3 text-lg text-muted-foreground">
+          Track care tasks across your team — powered by the Lumen Health platform.
+        </p>
+        <div className="mt-6">
+          <Link href="/tasks">
+            <Button size="lg">Open Care Tasks</Button>
+          </Link>
+        </div>
+      </div>
+      <div className="grid gap-6 sm:grid-cols-2">
         <section className="rounded-lg border p-4">
           <h2 className="mb-2 font-medium">API Status</h2>
             <div className="flex items-center gap-2">
@@ -40,6 +46,12 @@ export default function Home() {
                     : "Disconnected"}
               </span>
             </div>
+        </section>
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">Deployment</h2>
+          <span className="text-sm text-muted-foreground">
+            version: {version ?? "…"}
+          </span>
         </section>
       </div>
     </div>

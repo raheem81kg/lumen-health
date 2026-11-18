@@ -61,8 +61,8 @@ export default function TodosPage() {
     <div className="mx-auto w-full max-w-md py-10">
       <Card>
         <CardHeader>
-          <CardTitle>Todo List</CardTitle>
-          <CardDescription>Manage your tasks efficiently</CardDescription>
+          <CardTitle>Care Tasks</CardTitle>
+          <CardDescription>Track patient care and wellness tasks</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -72,7 +72,7 @@ export default function TodosPage() {
             <Input
               value={newTodoText}
               onChange={(e) => setNewTodoText(e.target.value)}
-              placeholder="Add a new task..."
+              placeholder="Add a care task..."
               disabled={createMutation.isPending}
             />
             <Button
@@ -93,7 +93,7 @@ export default function TodosPage() {
               </div>
             ) : todos.data?.length === 0 ? (
               <p className="py-4 text-center">
-                No todos yet. Add one above!
+                No care tasks yet. Add one above!
               </p>
             ) : (
               <ul className="space-y-2">
@@ -121,7 +121,7 @@ export default function TodosPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteTodo(todo.id)}
-                      aria-label="Delete todo"
+                      aria-label="Delete task"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
