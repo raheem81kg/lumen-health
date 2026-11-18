@@ -1,0 +1,16 @@
+#cloud-config
+# First-boot provisioning for the Lumen Health VM.
+# Installs Docker + Compose plugin and prepares the deploy directory.
+# Application containers are deployed by CI, not here.
+
+package_update: true
+
+packages:
+  - docker.io
+  - docker-compose-v2
+
+runcmd:
+  - systemctl enable --now docker
+  - usermod -aG docker lumenadmin
+  - mkdir -p /opt/lumen
+  - chown lumenadmin:lumenadmin /opt/lumen
