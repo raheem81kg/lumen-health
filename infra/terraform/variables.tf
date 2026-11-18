@@ -22,13 +22,13 @@ variable "environment" {
 variable "location" {
   description = "Azure region."
   type        = string
-  default     = "uksouth"
+  default     = "eastus"
 }
 
 variable "vm_size" {
-  description = "VM SKU. B1s is the cheapest option that runs docker-compose comfortably."
+  description = "VM SKU. D2as_v4 (2 vCPU / 8 GB) comfortably runs web + api + Prometheus + Grafana on one box."
   type        = string
-  default     = "Standard_B1s"
+  default     = "Standard_D2as_v4"
 }
 
 variable "admin_username" {
