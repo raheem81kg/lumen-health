@@ -1,0 +1,27 @@
+{
+  "name": "@lumen-health/db",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:deploy": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@lumen-health/config": "workspace:*",
+    "drizzle-kit": "1.0.0-rc.5",
+    "varlock": "catalog:"
+  },
+  "dependencies": {
+    "zod": "catalog:",
+    "drizzle-orm": "catalog:",
+    "@neondatabase/serverless": "^1.2.0"
+  }
+}

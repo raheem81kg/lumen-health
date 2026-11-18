@@ -1,0 +1,30 @@
+{
+  "name": "server",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "check-types": "tsc --noEmit",
+    "compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.mjs",
+    "env:generate": "varlock codegen"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.8",
+    "@hono/trpc-server": "^0.4.2",
+    "@lumen-health/api": "workspace:*",
+    "@lumen-health/db": "workspace:*",
+    "@trpc/server": "catalog:",
+    "hono": "^4.13.18",
+    "varlock": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@lumen-health/config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "^0.23.7",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}

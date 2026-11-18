@@ -1,0 +1,3 @@
+{
+  "extends": "@lumen-health/config/tsconfig.base.json",
+}

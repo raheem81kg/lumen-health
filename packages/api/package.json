@@ -1,0 +1,23 @@
+{
+  "name": "@lumen-health/api",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@lumen-health/config": "workspace:*"
+  },
+  "dependencies": {
+    "zod": "catalog:",
+    "@lumen-health/db": "workspace:*",
+    "@trpc/server": "catalog:",
+    "@trpc/client": "catalog:",
+    "drizzle-orm": "catalog:",
+    "@types/pg": "^8.23.1"
+  }
+}

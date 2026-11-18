@@ -1,0 +1,25 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  esbuild: true
+  sharp: true
+overrides:
+  "@next/env": npm:@varlock/nextjs-integration@2.0.1
+catalog:
+  zod: ^4.6.7
+  typescript: ^6.0.3
+  "@types/node": ^26.6.6
+  varlock: 1.25.0
+  "@trpc/server": ^11.28.0
+  lucide-react: ^1.72.0
+  next-themes: ^0.4.6
+  react: ^19.3.1
+  react-dom: ^19.3.1
+  sonner: ^2.0.8
+  "@trpc/client": ^11.28.0
+  "@tailwindcss/postcss": ^4.3.5
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
+  tailwindcss: ^4.3.5
+  drizzle-orm: 1.0.0-rc.5
