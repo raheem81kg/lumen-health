@@ -76,9 +76,17 @@ export TF_VAR_subscription_id="<subscription-id>"
 export TF_VAR_ssh_public_key="$(cat ~/.ssh/lumen-deploy.pub)"
 
 terraform init                                  # download provider (once)
+
+# Each env lives in its own workspace = its own state file.
+terraform workspace select staging
 terraform plan  -var-file=envs/staging.tfvars   # dry run
 terraform apply -var-file=envs/staging.tfvars   # build it
-terraform destroy -var-file=envs/staging.tfvars # tear it all down
+
+terraform workspace select prod
+terraform apply -var-file=envs/prod.tfvars      # build prod (same code)
+
+terraform workspace select staging
+terraform destroy -var-file=envs/staging.tfvars # tear an env down
 
 terraform fmt        # format .tf files
 terraform validate   # syntax check
@@ -91,9 +99,11 @@ Notes:
   nothing changed → `No changes. Infrastructure is up-to-date.`. If
   someone edits resources in the portal, the next apply detects the drift
   and offers to put it back.
-- `terraform.tfstate` (gitignored) is Terraform's memory — lose it and it
-  forgets what it built. The commented `backend "azurerm"` block in
-  `versions.tf` is the fix for shared/CI use.
+- `terraform.tfstate` + `terraform.tfstate.d/` (gitignored) are
+  Terraform's memory — one state file per workspace (env). Lose them and
+  it forgets what it built. The commented `backend "azurerm"` block in
+  `versions.tf` is the fix for shared/CI use. A `check` block in
+  `main.tf` refuses to apply a tfvars file in the wrong workspace.
 - Never `apply` while a `destroy` or RG delete is still propagating —
   Azure deletes are async and racing them creates orphaned resources.
   Wait for `az group exists -n rg-lumen-staging` → `false` first.

@@ -12,6 +12,16 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 }
 
+# Guard: each environment lives in its own workspace (and therefore its
+# own state file). Applying prod.tfvars while "staging" is selected would
+# otherwise rename the staging environment — this fails fast instead.
+check "env_matches_workspace" {
+  assert {
+    condition     = var.environment == terraform.workspace
+    error_message = "Environment mismatch: -var-file says \"${var.environment}\" but workspace is \"${terraform.workspace}\". Run: terraform workspace select ${var.environment}"
+  }
+}
+
 resource "azurerm_resource_group" "main" {
   name     = "rg-${local.prefix}"
   location = var.location
