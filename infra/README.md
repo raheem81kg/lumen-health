@@ -62,6 +62,49 @@ Outputs print the VM's FQDN, SSH command, and app URL.
 > Storage container so CI and every teammate apply against one state.
 > Documented in `versions.tf`; left local for this project.
 
+## Cheat sheet
+
+Terraform describes infrastructure as code: `*.tf` files declare "a VM +
+network + firewall + IP, named and tagged like this", and `terraform apply`
+makes Azure match. Environments are identical code with different
+`-var-file` values — `staging.tfvars` (env=staging, `10.10.x.x`) vs
+`prod.tfvars` (env=prod, `10.20.x.x`).
+
+```bash
+# one-time: auth vars (az login must also be done)
+export TF_VAR_subscription_id="<subscription-id>"
+export TF_VAR_ssh_public_key="$(cat ~/.ssh/lumen-deploy.pub)"
+
+terraform init                                  # download provider (once)
+terraform plan  -var-file=envs/staging.tfvars   # dry run
+terraform apply -var-file=envs/staging.tfvars   # build it
+terraform destroy -var-file=envs/staging.tfvars # tear it all down
+
+terraform fmt        # format .tf files
+terraform validate   # syntax check
+terraform import <resource> <azure-id>  # adopt an orphaned resource
+```
+
+Notes:
+
+- **Re-running `apply` is safe.** Terraform diffs config vs recorded state:
+  nothing changed → `No changes. Infrastructure is up-to-date.`. If
+  someone edits resources in the portal, the next apply detects the drift
+  and offers to put it back.
+- `terraform.tfstate` (gitignored) is Terraform's memory — lose it and it
+  forgets what it built. The commented `backend "azurerm"` block in
+  `versions.tf` is the fix for shared/CI use.
+- Never `apply` while a `destroy` or RG delete is still propagating —
+  Azure deletes are async and racing them creates orphaned resources.
+  Wait for `az group exists -n rg-lumen-staging` → `false` first.
+- If apply fails with "Root object was present, but now absent", the
+  resource was created but never recorded (known azurerm read-after-write
+  race). Fix: `terraform import <addr> <azure-id> -var-file=...` then
+  re-run apply.
+- Trial sub quota: 4 vCPU per region, counted even when VMs are
+  deallocated. Delete unused VMs fully (and their disks/IPs) before
+  applying.
+
 ## Port map (open on the NSG)
 
 | Port | Service |
