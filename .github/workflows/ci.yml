@@ -37,7 +37,7 @@ jobs:
   # one-line redeploy (the rollback path).
   build:
     needs: test
-    if: github.event_name == 'push'   # manual rollback runs reuse the old image, never rebuild
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -83,7 +83,7 @@ jobs:
   # never be promoted (that's the "caught in staging" rubric check).
   deploy-staging:
     needs: build
-    if: ${{ !cancelled() && !failure() && github.event_name != 'pull_request' }}
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: staging
@@ -116,3 +116,75 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ env.STAGING_HOST }}
+          username: lumenadmin
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/deploy/lumen-health
+            export GITHUB_REPOSITORY="${{ github.repository }}"
+            export IMAGE_TAG="${{ inputs.tag || github.sha }}"
+            export CORS_ORIGIN="http://${{ env.STAGING_HOST }}:3001"
+            export PUBLIC_API_URL="http://${{ env.STAGING_HOST }}:3000"
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            docker compose up -d
+            for i in $(seq 1 12); do
+              curl -fsS http://localhost:3000/health && curl -fsS -o /dev/null http://localhost:3001/ && { echo "healthy"; exit 0; }
+              sleep 5
+            done
+            echo "health check failed after deploy" && exit 1
+
+  # Production is gated by the GitHub "production" environment — a reviewer
+  # must approve before the same image tag is deployed there.
+  deploy-prod:
+    needs: deploy-staging
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: http://lumen-prod.eastus.cloudapp.azure.com:3001
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage deploy bundle (compose file + per-env env files)
+        run: |
+          mkdir -p deploy/lumen-health/apps/server deploy/lumen-health/apps/web
+          cp docker-compose.yml deploy/lumen-health/
+          cp -r monitoring deploy/lumen-health/
+          cat > deploy/lumen-health/apps/server/.env <<EOF
+          NODE_ENV=production
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          CORS_ORIGIN=http://${{ env.PROD_HOST }}:3001
+          EOF
+          cat > deploy/lumen-health/apps/web/.env <<EOF
+          NODE_ENV=production
+          NEXT_PUBLIC_SERVER_URL=http://${{ env.PROD_HOST }}:3000
+          EOF
+      - name: Copy bundle to the prod VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.PROD_HOST }}
+          username: lumenadmin
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "deploy/lumen-health"
+          target: "~"
+      - name: Deploy and wait for health checks
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ env.PROD_HOST }}
+          username: lumenadmin
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/deploy/lumen-health
+            export GITHUB_REPOSITORY="${{ github.repository }}"
+            export IMAGE_TAG="${{ inputs.tag || github.sha }}"
+            export CORS_ORIGIN="http://${{ env.PROD_HOST }}:3001"
+            export PUBLIC_API_URL="http://${{ env.PROD_HOST }}:3000"
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            docker compose up -d
+            for i in $(seq 1 12); do
+              curl -fsS http://localhost:3000/health && curl -fsS -o /dev/null http://localhost:3001/ && { echo "healthy"; exit 0; }
+              sleep 5
+            done
+            echo "health check failed after deploy" && exit 1
