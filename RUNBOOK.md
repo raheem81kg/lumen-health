@@ -1,76 +1,63 @@
 # Lumen Health — operations and recovery runbook
 
-Owner: Terri-Etana Thoms (reliability and security). Updated 20 November 2026.
+**Owner:** Terri-Etana Thoms, reliability and security
+**Updated:** 20 November 2026
 
-## Current state and ownership
+## Current platform
 
-The current `main` branch contains a Next.js web app, Hono API, Docker Compose and Azure Terraform for staging and production. It does **not** yet contain an Actions deployment workflow or Prometheus/Grafana Compose services. `docs/architecture.md` describes the intended pipeline and observability system; those portions are a design, not observed live infrastructure.
+The original repository contains a Next.js web app (port 3001), Hono API (port 3000), Docker Compose, Azure Terraform, `.github/workflows/ci.yml`, Prometheus alert rules and a Grafana dashboard. The workflow tests, builds SHA-tagged web/API images, deploys to staging and then has a production job. GitHub Environment secrets and protection rules are configured outside the repository and cannot be verified from the YAML alone.
 
-| Concern | Repository source | Responsible handoff |
-|---|---|---|
-| API and database readiness | `apps/server/src/index.ts`, `apps/server/.env.schema` | API/DB owner |
-| VM, SSH access and state | `infra/terraform`, `infra/README.md` | Raheem, infrastructure |
-| Build, release and environment approvals | Future `.github/workflows/ci.yml` | Matthew, pipeline |
-| Metrics and alerts | API `/metrics`; future monitoring configuration | Max, observability |
-| Secrets, incident response and rollback record | `docs/SECRETS.md`, this runbook | Terri, reliability and security |
-
-## Day 1 — inventory and checks
-
-- Web listens on port 3001; API listens on port 3000 in `docker-compose.yml`. Local Compose builds images from `apps/web/Dockerfile` and `apps/server/Dockerfile`; it does not pull released image tags.
-- `apps/server/.env.schema` defines `NODE_ENV`, `CORS_ORIGIN`, and `DATABASE_URL`; `apps/web/.env.schema` defines `NODE_ENV` and `NEXT_PUBLIC_SERVER_URL`. `packages/db/.env.schema` imports database configuration. See [SECRETS.md](SECRETS.md) for placement and handling.
-- `/health` checks the API process; `/ready` checks a database query and returns 503 on failure; `/version` reports `APP_VERSION`, `GIT_SHA`, or `dev`. `/metrics` exposes Prometheus format. These routes exist in source; remote availability has not been verified.
-- Terraform has separate `staging` and `prod` workspaces and tfvars. The infrastructure owner must check state, VM outputs and network restrictions; do not infer deployed hosts from the tfvars alone.
-
-## Day 2 — deployment procedure
-
-**Preconditions:** Pipeline owner has implemented and reviewed CI, immutable image publishing, staging deployment and a production approval gate. Infrastructure owner has confirmed VM and database separation. Environment secrets are configured and a known-good release is recorded. The fault-injection route is disabled or restricted in production.
-
-1. Record the proposed commit SHA and the last known-good image SHA. Confirm web and API images use the **same immutable tag**.
-2. Run type checks and build checks in CI. Publish images to GHCR only after checks pass; use harmless build placeholders if the build needs a syntactically valid database URL. Supply real `DATABASE_URL` only at runtime.
-3. Deploy the commit's images to staging. Confirm the container image tags and environment identity. Do not build an older source tree under a reused tag.
-4. Check `GET /health`, `GET /ready`, `GET /version` and the web homepage. `/ready` must return success and `/version` must match the intended SHA. Observe errors and latency if monitoring has been configured.
-5. Record the Actions run, staging host, SHA, results and reviewer. Promote the same image SHA to production only through the configured required-reviewer gate. Recheck health, readiness, version and user-visible behavior.
-
-For the current local Compose implementation, use `docker compose config` with ignored local env files, then `docker compose up -d --build`, `docker compose ps`, and `docker compose logs --tail 50 server web`. These commands validate a local setup; they are not a production release procedure.
-
-## Rollback procedure
-
-**Trigger:** New release causes failed readiness, sustained 5xx errors, high latency or a user-visible regression. An image rollback does not reverse a database migration; the database owner must confirm schema compatibility.
-
-1. Identify the last known-good **published** web and API image tags and their matching SHA.
-2. Obtain the required environment approval, then redeploy those existing images without rebuilding or retagging current source. Keep the previous release and current release IDs in the incident record.
-3. Verify API `/health`, `/ready`, `/version`, web response and error/latency recovery. Record detection, rollback start and recovery times; the proposed under-10-minute objective is unmeasured until a rehearsal is performed.
-4. If readiness still fails, inspect database connectivity and container logs, then escalate to the API/DB or infra owner. Avoid Terraform apply/destroy and avoid guessing at production credentials during incident response.
-
-No image-based rollback command can be executed from the current `docker-compose.yml` because it specifies builds and no registry image tags. The pipeline owner must implement and test a released-image deployment path before this procedure can be signed off.
-
-## Alerts and first response
-
-| Signal | Check | Response |
-|---|---|---|
-| API unavailable | `/health`, Compose status and logs | Determine VM/container issue; involve infrastructure owner; consider rollback if release-related |
-| Database not ready | `/ready` status and API logs | Check Neon reachability and correct environment credential with DB owner; never paste the URL into logs |
-| Elevated 5xx | API metrics, deploy SHA, logs | Compare with release time; roll back confirmed release regression |
-| High p95 latency | Metrics, database readiness and traffic | Investigate load or dependency delay with API/DB owner; escalate sustained impact |
-
-Thresholds, alert receiver, dashboard URL and paging contact remain to be defined by the observability owner. Do not claim alert firing or acknowledgement until configured and tested.
-
-## Evidence log
-
-| Field | Record after a real run |
+| Responsibility | Owner |
 |---|---|
-| Environment, date, operator and reviewer | Pending |
-| CI run URL, commit SHA and image digests | Pending |
-| `/health`, `/ready`, `/version`, web result | Pending |
-| Alert or dashboard link and observed metric | Pending |
-| Rollback target, start/end time and recovery | Pending |
-| Follow-up owner and outcome | Pending |
+| Azure VMs, Terraform, SSH access | Raheem |
+| CI, GHCR images, deployment and rollback workflow | Matthew |
+| Prometheus, Grafana, alert rules and panels | Max |
+| Secrets inventory, procedures, incident timeline and evidence | Terri |
 
-## Remaining gates
+## Before a deployment
 
-- [x] Inventory repo configuration, routes and secrets without disclosing values.
-- [x] Document deployment, rollback and alert response procedures.
-- [ ] CI and GHCR release path implemented by pipeline owner.
-- [ ] Staging/production environments, secrets, VM hosts and production required reviewers verified by owners.
-- [ ] Fault injection restricted; monitoring and alert routing configured.
-- [ ] Staging release and rollback performed; evidence and measured recovery added.
+1. Confirm the target is staging or production, the approved commit SHA, the previous known-good SHA and database compatibility. Both web and API images must exist in GHCR under the same immutable SHA tag.
+2. Check that `staging` and `production` GitHub Environments have distinct `DATABASE_URL` and `DEPLOY_SSH_KEY` values. The VM's GHCR read credential must be available where needed. Never print or commit these values.
+3. Confirm production **required reviewers** are configured in repository settings. `environment: production` alone is not an approval gate.
+4. Confirm the VM is reachable, Docker Compose is installed, and the deployment directory and monitoring files exist. Confirm the intended `IMAGE_TAG`, `GITHUB_REPOSITORY`, `CORS_ORIGIN` and `PUBLIC_API_URL`.
+5. Do not expose the API's unauthenticated `/__debug/fault` route to the public or enable fault injection in production. Change the default Grafana admin password and restrict monitoring access before exposing these services.
+
+## Deploy and verify
+
+1. Push or merge an approved change to `main`. In **Actions → ci**, watch `test`, both `build` jobs, `deploy-staging`, then `deploy-prod`. A successful test/build does not mean the app was deployed.
+2. The staging job copies Compose, monitoring configuration and environment files to the staging VM, then pulls GHCR images and starts Compose. Record the workflow run and SHA. If the copy step fails, stop: no staging deploy has occurred.
+3. Check the staging API `/health`, `/ready`, `/version` and the web homepage. `/health` checks liveness, while `/ready` queries the database. Compare `/version` with the intended SHA if the release sets `GIT_SHA` or `APP_VERSION`.
+4. Observe Prometheus targets, alert state and Grafana panels. Investigate error rate and latency as well as liveness.
+5. Promote the **same image SHA** to production only after a green staging gate and configured production approval. Repeat health, readiness, version, web and monitoring checks. Record the reviewer and time.
+
+The present workflow's shell health gate checks `/health` and the web homepage, but does not check `/ready` or verify `/version`. Those additional checks must be performed manually until Matthew adds them to CI.
+
+## Rollback to a known-good release
+
+**Trigger:** Failed readiness, persistent 5xx errors, elevated latency or a user-visible regression after deployment. An image rollback does not reverse database migrations.
+
+1. Identify a previously published, known-good full commit SHA. Confirm both GHCR image tags exist and the target database schema is compatible.
+2. Coordinate the rollback with the pipeline owner. In **Actions → ci → Run workflow**, supply the previous SHA as `tag` for a staging rehearsal. Do not use production for a practice run.
+3. The manual path must deploy the existing images **without rebuilding**. Verify that `deploy-staging` actually runs: the current workflow sets `build` to skip on `workflow_dispatch`, while staging declares `needs: build`, so a manual run may skip staging as well. Matthew must fix and test this dependency before relying on the button for rollback.
+4. If the manual workflow is unavailable, only an authorized VM operator may redeploy a verified previous image tag using the approved recovery procedure. Do not improvise with production credentials or Terraform state.
+5. Confirm `/health`, `/ready`, `/version`, web response, image SHA and error/latency recovery. Record the decision, start and healthy times. Calculate the measured recovery duration and whether it was under ten minutes.
+6. If checks remain red, stop and involve the API/DB and infrastructure owners. Preserve logs and the incident timeline; redact any secrets.
+
+## Alert response
+
+The repository defines `ApiDown` (API scrape unavailable for 30 seconds), `HighErrorRate` (more than 0.1 errors/second over five minutes for 30 seconds), and `HighLatencyP95` (p95 above one second for one minute) in `monitoring/alerts.yml`. A checked-in rule is not proof that a running Prometheus instance loaded it or that a notification was delivered.
+
+| Signal | First checks | Response |
+|---|---|---|
+| `ApiDown` | `/health`, Compose status, API logs, Prometheus target | Involve infrastructure/API owner; rollback if tied to a release |
+| `/ready` fails | DB connectivity and API logs | Involve database owner; do not reveal the connection string |
+| `HighErrorRate` | 5xx panel, `/trpc/*`, release SHA, fault status in an authorized staging test | Distinguish injected fault from regression; clear an authorized test fault or roll back a bad release |
+| `HighLatencyP95` | Latency panel, DB readiness, traffic | Investigate dependency/load with API/DB owner |
+
+The Solo staging rehearsal documented in [the game-day report](https://github.com/raheem81kg/lumen-health-solo/blob/main/docs/game-day.md) showed `HighErrorRate` firing while `/health` stayed green. The operator cleared the injected fault; that exercise did **not** demonstrate an image rollback in this original repository.
+
+## Evidence and incident record
+
+Record the environment, operator, reviewer, failing and known-good SHA, Actions run URL, alert name and firing time, dashboard screenshot, decision time, rollback start, recovery time, final health/readiness/version results and follow-up owner. Use the [Solo Prometheus alert](https://github.com/raheem81kg/lumen-health-solo/blob/main/docs/evidence/screenshot-alert-HighErrorRate.png) and [Solo Grafana error spike](https://github.com/raheem81kg/lumen-health-solo/blob/main/docs/evidence/screenshot-dashboard-error-spike.png) only as evidence of that Solo fault exercise, not proof of a rollback here.
+
+**Latest observed original-repo state:** The latest completed `main` run reviewed before this update passed tests and both builds but failed while copying the bundle to the staging VM. A newer run was in progress when checked. No successful original-repo rollback timing has been verified. Update this paragraph with the exact run URL and result after the next completed run.
