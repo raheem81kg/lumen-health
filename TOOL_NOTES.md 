@@ -1,0 +1,32 @@
+# Nine-Step Tool Notes — GitHub Actions Environments and Secrets
+
+**My role:** Reliability and security  
+**Tool:** GitHub Actions Environments and secrets  
+**Project:** Lumen Health
+
+1. **Purpose**  
+   I use GitHub Actions Environments and secrets to keep deployment credentials out of the repository and make the correct credentials available to staging or production jobs.
+
+2. **Where the tool fits**  
+   The workflow is defined in `.github/workflows/ci.yml`. It tests the code, builds the web and API images, deploys to staging, and then has a production deployment job. I review how credentials pass through those jobs.
+
+3. **Environment separation**  
+   The staging job references the `staging` environment, while the production job references `production`. Each environment should have its own `DATABASE_URL` and `DEPLOY_SSH_KEY`, so a staging deployment does not use production credentials.
+
+4. **How secrets reach a job**  
+   A workflow step reads a configured value through the `secrets` context, such as `${{ secrets.DEPLOY_SSH_KEY }}`. A job that references an environment receives that environment’s secrets after its configured protection rules are satisfied.
+
+5. **Deployment approval**  
+   The production job names the `production` environment, but that name alone does not require a human approval. A repository administrator must configure **required reviewers** in the environment settings. I check for that rule before treating production promotion as protected.
+
+6. **Internals**  
+   GitHub starts each job on a runner. The runner receives the secrets available to that job, executes its steps, and records their status. The deployment jobs use an SSH key to copy files to a VM and run Docker Compose there. The API then receives its database connection at runtime. A secret used by a job should not be printed or baked into a published image.
+
+7. **Logs and troubleshooting**  
+   I inspect **Actions → ci → workflow run → job → step** to find where a failure occurred. In the run I reviewed, tests and both image builds passed, but **Copy bundle to the staging VM** failed with “can't connect without a private SSH key or password.” That points to a missing or unavailable `DEPLOY_SSH_KEY` for the staging job; it does not prove the deployment or rollback succeeded.
+
+8. **Limits and risks**  
+   GitHub masks configured secrets in logs, but masking is not a reason to print them. A missing secret can cause a job to fail, and a secret scoped to the wrong environment may not be available where needed. GitHub Actions cannot confirm that a VM is healthy merely because an image built successfully. The current workflow also needs its manual rollback dependency checked so a skipped build job does not prevent deployment of an older image.
+
+9. **My verification and evidence**  
+   I verify the **names and scopes** of secrets without viewing or recording their values. I check that staging deploys successfully, `/health` and `/ready` pass, production approval is configured, and a rollback uses an existing known-good image SHA without rebuilding it. I record the workflow links, relevant redacted job logs, health results, and recovery time in the runbook and game-day evidence pack.
