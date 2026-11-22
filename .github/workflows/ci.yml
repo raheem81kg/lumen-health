@@ -16,8 +16,8 @@ permissions:
   packages: write
 
 env:
-  STAGING_HOST: lumen-staging.eastus.cloudapp.azure.com
-  PROD_HOST: lumen-prod.eastus.cloudapp.azure.com
+  STAGING_HOST: lumen-staging2.eastus.cloudapp.azure.com
+  PROD_HOST: lumen-prod2.eastus.cloudapp.azure.com
 
 jobs:
   # A failing check fails this job, and everything downstream is skipped — nothing deploys.
