@@ -1,69 +1,71 @@
-# Lumen Health — Operations and Recovery Runbook
+# Lumen Health Reliability and Security
 
-**Owner:** Terri-Etana Thoms
+**Owner:** Terri-Etana Thoms  
+**Project:** Lumen Health
 
-## Platform and responsibilities
+## My responsibility
 
-Lumen Health uses a Next.js web app, a Hono API, Docker Compose, Azure VMs, GitHub Actions, GHCR, Prometheus, and Grafana. The CI workflow tests the application, builds web and server images, deploys to staging, and then deploys to production.
+I maintain the project's operational documentation and evidence process. My work covers secret handling, deployment verification, alert response, rollback procedures, and the game-day record. I coordinate these checks with Raheem's infrastructure work, Matthew's CI/CD work, and Max's monitoring work.
 
-| Area | Owner |
+## Documentation delivered
+
+| Document | Purpose |
 |---|---|
-| Azure VMs, Terraform, and SSH access | Raheem |
-| CI/CD, images, deployment, and rollback workflow | Matthew |
-| Prometheus, Grafana, alerts, and dashboards | Max |
-| Secrets documentation, operating procedures, and game-day evidence | Terri |
+| [RUNBOOK.md](RUNBOOK.md) | Deployment, health checks, rollback, and alert response |
+| [SECRETS.md](SECRETS.md) | Secret names, locations, ownership, and handling |
+| [TOOL_NOTES.md](TOOL_NOTES.md) | Nine-step notes on GitHub Actions Environments and secrets |
+| [Game_Day.md](Game_Day.md) | Dated rehearsal results, timeline, screenshots, and findings |
 
-## Before deployment
+## Day 1 — operating and secret documentation
 
-1. Identify the approved commit SHA and the previous known-good SHA.
-2. Confirm both web and server images have the intended tag in GHCR.
-3. Confirm the target environment has working `DATABASE_URL`, `DEPLOY_SSH_KEY`, and `GHCR_PAT` values. See [SECRETS.md](SECRETS.md). Never place credential values in this repository or screenshots.
-4. Confirm the VM is reachable and Docker Compose is available.
-5. Confirm the production GitHub Environment has its required-reviewer rule configured.
-6. Check that the application version is compatible with the target database schema. An image rollback does not reverse database changes.
-7. Restrict access to the fault-injection endpoint, Prometheus, and Grafana. Use the fault endpoint only for an authorized staging rehearsal.
+I documented the application's components, team responsibilities, deployment prerequisites, and recovery procedure in the runbook.
 
-## Deploy and verify
+I documented which configuration belongs in local environment files, GitHub secrets, and the deployed environment in `SECRETS.md`. The repository documentation contains secret names and instructions, not credential values.
 
-1. Push or merge an approved change to `main`.
-2. In **GitHub → Actions → ci**, follow the `test`, `build (web)`, `build (server)`, `deploy-staging`, and `deploy-prod` jobs.
-3. Confirm that staging pulls the intended images, starts Docker Compose, and passes its workflow health checks.
-4. Check the staging web page and API `/health`, `/ready`, and `/version` routes.
-5. Check the Prometheus target, alert state, Grafana dashboard, error rate, and latency.
-6. Promote the same tested image SHA to production through the configured approval process.
-7. Repeat the web, API, and monitoring checks in production. Record the run URL, SHA, approval, and result.
+## Day 2 — deployment and monitoring integration
 
-The workflow checks `/health` and the web home page. Also check `/ready` for database access and `/version` for release identification.
+The repository contains a GitHub Actions workflow that tests the project, builds web and server container images, and deploys them to staging and production. The workflow uses GitHub secrets for database access, SSH deployment, and GHCR access.
 
-## Rollback to a known-good image
+The project also contains Prometheus scrape configuration, alert rules, and a Grafana dashboard. The runbook connects the deployment workflow to application health checks and alert-response steps.
 
-**Use when:** A deployment causes persistent errors, failed readiness, high latency, or a user-visible regression.
+For every release, I distinguish between:
 
-1. Identify a previously working **full commit SHA** and confirm both corresponding GHCR images exist.
-2. Check that the older application version is compatible with the current database schema.
-3. Coordinate the rollback with the pipeline and infrastructure owners. Test the procedure on staging before relying on it for production.
-4. Use the verified rollback procedure to redeploy both web and server images with the previous SHA. The GitHub Actions workflow offers a **Run workflow** `tag` input; confirm its manual deployment jobs actually run before treating it as a working rollback path.
-5. Check the web page, `/health`, `/ready`, `/version`, image SHA, API error rate, and latency after deployment.
-6. Record the fault time, alert time, rollback start, healthy recovery time, operator, image SHAs, workflow run URL, and total recovery duration.
-7. If the service remains unhealthy, involve the API/database and infrastructure owners. Preserve redacted logs.
+- A passing test and image build
+- A completed deployment job
+- A healthy running application
+- A verified recovery after rollback
 
-A passing test, image build, or pull-request check titled “Rollback” does not prove that an older image was deployed. Rollback evidence must show the older image tag and healthy recovery.
+Each result is supported by its relevant workflow run, application check, or monitoring evidence.
 
-## Alert response
+## Day 3 — rehearsal and evidence
 
-The alert rules are defined in `monitoring/alerts.yml`.
+I maintain `Game_Day.md` as the dated record of the team's staging rehearsal. It contains the fault, alert, response, rollback, and healthy recovery sequence, supported by workflow links and screenshots.
 
-| Alert or signal | First checks | Response |
-|---|---|---|
-| `ApiDown` | `/health`, Compose status, API logs, Prometheus target | Investigate the API and VM; roll back if linked to a release |
-| `/ready` fails | Database connectivity and API logs | Involve the database owner without exposing credentials |
-| `HighErrorRate` | 5xx traffic, release SHA, Grafana panel, authorized staging fault state | Identify the cause; clear an authorized test fault or roll back a bad image |
-| `HighLatencyP95` | Latency panel, database readiness, traffic, recent changes | Investigate the affected service and dependency |
+I record the event times, image SHAs, operator actions, health and readiness results, and measured recovery duration. I compare that duration with the team's target of restoring healthy service in under ten minutes.
 
-A rule in the repository is not proof that Prometheus loaded it or that an alert fired. Confirm the live alert state and record it during game day.
+## Verification checklist
 
-## Game-day evidence
+| Area | Evidence to record |
+|---|---|
+| CI | Passing test and web/server image builds |
+| Staging deployment | Successful deployment job and staging application checks |
+| Production deployment | Successful approved deployment and production checks |
+| API process | `/health` response |
+| Database access | `/ready` response |
+| Release identity | Image tag and `/version` result when configured |
+| Monitoring | Prometheus target, alert state, and Grafana panels |
+| Rollback | Previous image SHA deployed and healthy traffic restored |
+| Recovery time | Recorded event times and calculated duration |
+| Secret handling | Secret names and scopes, without exposing values |
 
-The [Solo game-day report](https://github.com/raheem81kg/lumen-health-solo/blob/main/docs/game-day.md) documents an earlier fault-and-alert exercise. Its [alert screenshot](https://github.com/raheem81kg/lumen-health-solo/blob/main/docs/evidence/screenshot-alert-HighErrorRate.png) and [dashboard screenshot](https://github.com/raheem81kg/lumen-health-solo/blob/main/docs/evidence/screenshot-dashboard-error-spike.png) show detection and recovery after the injected fault was cleared. That exercise is separate from an image rollback in this group repository.
+## Security practices
 
-The group's rehearsal results, workflow links, screenshots, event times, and measured recovery duration belong in [Game_Day.md](Game_Day.md). Keep that file as the evidence record so this runbook remains a reusable operating procedure.
+- Keep database URLs, SSH private keys, tokens, and passwords out of committed files and screenshots.
+- Give staging and production their appropriate credentials.
+- Limit access to the virtual machines and monitoring interfaces.
+- Use the fault-injection route only during an authorized staging exercise.
+- Record incident findings without copying sensitive values into the evidence pack.
+
+## Evidence standard
+
+A workflow marked successful shows that its jobs completed. A rollback is demonstrated by an older known-good image being deployed, followed by healthy application and monitoring checks. `Game_Day.md` holds the dated evidence; this file describes how I verify and document it.
